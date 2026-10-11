@@ -1,0 +1,31 @@
+{
+  "name": "dsh-model-selector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "omp-style model selector scene for dsh-TUI: type-to-search, starred models, provider sidebar on the right",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "link-host": "node scripts/link-host.mjs",
+    "test": "node scripts/link-host.mjs && node --preserve-symlinks --test test/*.test.js",
+    "test:e2e": "node --test --test-concurrency=1 --test-timeout=300000 test/e2e/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@xterm/headless": "^5.5.0",
+    "fast-check": "^4.10.2"
+  }
+}
