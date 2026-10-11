@@ -26,7 +26,7 @@ describe('dsh-TUI with dsh-model-selector (e2e)', { skip: !process.env.DSH_TUI_D
     if (!process.env.KEEP_E2E) profile?.dispose();
   });
 
-  it('bare /model on the launch page opens the scene; Esc returns to the launch page', async () => {
+  it('bare /model on the launch page opens the scene; Esc returns to a clean launch page', async () => {
     tui.text('/model');
     await sleep(300);
     tui.keys('Enter');
@@ -35,13 +35,30 @@ describe('dsh-TUI with dsh-model-selector (e2e)', { skip: !process.env.DSH_TUI_D
     assert.match(screen, /Mock Two\s+1/u);
     assert.match(screen, /❯\s+mock\/mock-alpha ✓/u, 'live model preselected and marked');
     tui.keys('Escape');
-    // Back on the launch page with the draft kept — the stock picker does the same.
-    await tui.waitFor(/⌘ \/model[\s\S]*Sessions & workspaces/u);
-    assert.doesNotMatch(tui.capture(), /⌕ >/u);
-    // Stock launch page: Esc dismisses the command palette, Esc again clears the draft.
-    tui.keys('Escape');
-    await sleep(400);
-    tui.keys('Escape');
+    // Back on a clean launch page: the typed /model draft is gone.
+    const back = await tui.waitFor(/Say something/u);
+    assert.doesNotMatch(back, /⌕ >|⌘ \/model/u);
+  });
+
+  it('picking a model from a typed /model on the launch page wipes the /model draft', async () => {
+    tui.text('/model');
+    await sleep(300);
+    tui.keys('Enter');
+    await tui.waitFor(SCENE);
+    tui.text('gamma');
+    await tui.waitFor(/❯\s+mock\/mock-gamma-1-5/u);
+    tui.keys('Enter');
+    await tui.waitFor(/⌕ >/u, { not: true });
+    await tui.waitFor(/mock-gamma-1-5/u);
+    const screen = await tui.waitFor(/Say something/u, { timeout: 5000 });
+    assert.doesNotMatch(screen, /⌘ \/model/u, 'no leftover /model draft');
+    // back to mock-alpha for the rest of the suite
+    tui.keys('M-p');
+    await tui.waitFor(SCENE);
+    tui.text('alpha');
+    await tui.waitFor(/❯\s+mock\/mock-alpha/u);
+    tui.keys('Enter');
+    for (let i = 0; i < 100 && profile.read('model.json')?.model !== 'mock-alpha'; i += 1) await sleep(100);
     await tui.waitFor(/Say something/u);
   });
 

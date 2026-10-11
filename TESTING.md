@@ -75,8 +75,8 @@ isolated `HOME`/`DSH_HOME` and a local OpenAI-compatible mock provider (no
 network, no credentials). Covers what only the integrated host can show:
 
 1. the plugin loads from `cordis.patch.yml` with no warnings in the dsh log;
-2. bare `/model` opens this scene (dsh-TUI patch); Esc lands back on the launch
-   page with the draft kept, exactly as the stock picker does; `/model
+2. bare `/model` opens this scene (dsh-TUI patch); Esc or a pick lands back on
+   a clean launch page (the typed `/model` draft is dropped); `/model
    provider/id` still switches directly without opening it;
 3. Alt+P (nix-config's dsh-omp-keys patch, routed through `/model`) opens it
    from the launch page and from chat;
