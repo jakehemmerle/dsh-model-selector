@@ -30,7 +30,7 @@ const rowOf = (frame, key) => frame.rows.find((r) => r.selector === key);
 
 describe('stars write failures (dms-0ll.10)', () => {
   it('a Space with an unwritable stars file shows the persisted state (no phantom star) and tells the user', async () => {
-    const { host, s, calls } = await bootWithUnwritableStars();
+    const { host, s, home, calls } = await bootWithUnwritableStars();
     try {
       const before = s.frame();
       const row = rowOf(before, 'mock/mock-beta') ?? rowOf(before, 'mock/mock-alpha');
