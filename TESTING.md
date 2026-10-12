@@ -92,3 +92,25 @@ The rig (`test/e2e/dsh-tui.js`) writes an isolated profile that mirrors
 nix-config's dsh-tui profile: the patched dsh-TUI symlinked in, the plugin
 inserted with `shortcut: false`, and two `openai-completions` providers
 pointing at the mock.
+
+## Traceability (SPEC ↔ tests, round 2 status 2026-10-12)
+
+Versions under test: DSH `0.2.1-alpha.2`, dsh-TUI `0.14.0` (fleet patch stack,
+`nix/fleet/`), node v24.21.0. Hosts: fast suites via `TuiSceneRuntime` against
+`test/.host`; real-client suites against the store builds in a private tmux
+socket (`test/e2e/`).
+
+| SPEC property | Test | Surface | Last result |
+|---|---|---|---|
+| P-01…P-07, P-09…P-12, P-14…P-17 | `test/selector.property.test.js` (model-based through the host runtime) | TUI fast | green, NUM_RUNS=1000 in `nix flake check` (`checks.fast`, 30/30, 0 skipped, 644 s, 2026-10-11) and NUM_RUNS=25/40 locally |
+| P-08 landing/scope semantics | same, plus `test/selector.examples.test.js` | TUI fast | green (same runs) |
+| P-18 openings + draft drop, P-19 pick reaches the mock with history, P-20 no host warnings, P-13 busy refusal, P-16 restart persistence | `test/e2e/tui.e2e.test.js` (real dsh + patched dsh-TUI, private tmux socket) | TUI real | green, **10/10 consecutive loops** (8/8 tests each, 2026-10-11, after the restart-catalog-race fix `7ef3902`) |
+| P-01…P-07, P-09…P-17 (generated sequences on the real host: launch page AND chat, busy turn, restart) | `test/e2e/tui.property.test.js` (fast-check commands, invariants after every step, FC_SEED replay) | TUI real | green: **37 sequences** (launch 15 / chat 10 / busy 6 / restart 6), seeds `20261012`–`20261015`, 349 s (2026-10-12, commit `d2ae87d`) |
+| P-21 contract seams | `test/contract.test.js` | TUI fast | green (same runs) |
+| P-22 omp parity examples | `test/selector.examples.test.js` | TUI fast | green (same runs) |
+| P-23 failed stars write → persisted state + warning | `test/write-failure.test.js` | TUI fast | red `b273cbe` → green after fix `971f076` (33/33 fast suite) |
+| P-24 concurrent writers merge policy | `test/write-failure.test.js` (scene + simulated second writer) | TUI fast | green (RMW union verified); residual cross-process RMW window documented in SPEC; file-locking follow-up deferred |
+| P-25 web inertness | pending | Web real | **pending, round 3** (Playwright, plugin-loaded vs baseline) |
+
+No required test silently skips: the e2e suites fail loudly when `DSH_TUI_DIR`
+is unset, and `checks.fast` runs the fast suites inside the Nix build.

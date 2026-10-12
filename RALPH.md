@@ -35,23 +35,40 @@ vendor + rig vendor), verified it end-to-end, and landed it:
   fixed the race (`7ef3902`), **10/10 loops pass 8/8**.
 - playwright devDep added for the web inertness suite (`edcfd93`).
 
-### Next (round 2)
+### Round 2 (2026-10-12) — dms-0ll.6 ✓, .10 ✓, .11 ✓; .7 groundwork
 
-1. **dms-0ll.6** — fast-check generated key/command sequences on the real TUI
-   (private socket), ≥25 sequences/round, invariants after each step. The e2e
-   rig's `keys/text/capture/waitFor` is the driver; keep the oracle independent
-   of `lib/` (parse rows/query/focus from the frame; check `model-stars.json` on disk).
-2. **dms-0ll.10 / dms-0ll.11** — red tests at scene level via `test/harness.js`
-   (unwritable `starsFile` → no phantom star + user warning; external writer
-   between open and toggle → scene must not show a stale set), red commit, then fix.
-3. **dms-0ll.5** — web inertness (Playwright, real `dsh web`, plugin-loaded vs
-   baseline, ≥25 sequences, Nix Chromium via `playwright-driver.browsers`).
-4. **dms-0ll.7** — TESTING.md traceability refresh (add SPEC IDs, seeds, the
-   round-1 evidence above). **dms-0ll.8** mutants. **dms-0ll.9** release cut in round 3.
+- **dms-0ll.6 ✓** `test/e2e/tui.property.test.js`: fast-check generated
+  key/command sequences (12 command kinds) against the REAL patched dsh-TUI on
+  the private-socket rig — **launch page AND chat**, invariants after every
+  step (query echo, n/total vs parsed rows, exactly-one-focus with predicted
+  index/key, ★/✓ glyphs vs tracked sets, token soundness, stars-file oracle,
+  recents front after picks), plus generated busy-turn refusal and
+  restart-persistence groups. **37 sequences this round** (15/10/6/6), seeds
+  `20261012`–`20261015`, FC_SEED + TUI_PROP_* replay, green 4/4 in 349 s
+  (`d2ae87d`). Parser validated against real frames (`test/e2e/dump-frame.mjs`);
+  the frame grammar quirks are documented in the suite header (star column
+  separated by a space from the focus column; the profile's real llm catalog
+  has 6 models incl. deepseek-official registry rows).
+- **dms-0ll.10 ✓ (red→fix)** `test/write-failure.test.js`: unwritable
+  `starsFile` → Space showed a phantom star and no warning. Red `b273cbe`
+  (assertion-level red re-proven against the pre-fix lib), fix `971f076`:
+  `toggleStar` returns `{ stars, saved }` with the persisted state re-read on
+  failure; the scene reverts the row and warns "Could not save the star — the
+  stars file is not writable." Fast suite 33/33 green after the fix.
+- **dms-0ll.11 ✓** merge policy verified per SPEC P-24: two-writer scene test
+  green (external writer's star + own toggle persist via per-toggle RMW); the
+  real-TUI property suites cover restart convergence. Residual narrow
+  cross-process RMW window documented; file-locking follow-up deferred.
+- **dms-0ll.7 groundwork**: TESTING.md gained the SPEC ↔ test traceability
+  table with versions, seeds and results.
 
-## Known intermittent issues (watch in round 2)
+### Next (round 3)
 
-- The scene's catalog and `resolveModelInfo` render asynchronously; any test
-  asserting scene content must `waitFor` the row, never one-shot `assert.match`.
-- Input bursts (text+Enter with no pacing) can drop Enter in dsh-TUI; pace
-  ~300 ms or use a submit-with-until helper. Never retry away a real failure.
+1. **dms-0ll.5 web inertness** (Playwright, real dsh web, plugin-loaded vs
+   baseline, ≥25 sequences, Nix Chromium via playwright-driver.browsers;
+   playwright 1.59.1 devDep already in).
+2. **dms-0ll.8** mutation check (≥3 realistic mutants against the new suites;
+   record caught N/N in TESTING.md) and finish the traceability table (P-25
+   row) → close .7.
+3. **dms-0ll.9** release: RELEASING.md + CHANGELOG.md; release-run budgets
+   (≥100 sequences/surface across ≥3 seeds) if green → tag `v0.1.0-alpha.1`.
