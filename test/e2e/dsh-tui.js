@@ -119,20 +119,23 @@ export function makeProfile({ port }) {
   };
 }
 
-const tmux = (...args) => execFileSync('tmux', args, { encoding: 'utf8' });
+const tmux = (socket, ...args) => execFileSync('tmux', ['-f', '/dev/null', '-L', socket, ...args], { encoding: 'utf8' });
 
-/** One dsh-TUI instance in a detached tmux session. */
-export function startTui(profile, { name = `dsh-ms-e2e-${process.pid}-${Date.now()}`, cols = 150, rows = 40 } = {}) {
+/** One dsh-TUI instance in a detached tmux session on a PRIVATE socket.
+ *  -f /dev/null ignores any user tmux config; -L keeps Jake's default tmux
+ *  server untouched (dms-0ll.12). Every call goes through the same socket. */
+export function startTui(profile, { name = `dsh-ms-e2e-${process.pid}-${Date.now()}`, cols = 150, rows = 40, socket = name } = {}) {
   const bin = process.env.DSH_BIN ?? 'dsh';
   const env = [`HOME=${profile.home}`, `DSH_HOME=${profile.dshHome}`, 'MOCK_KEY=mock', 'DSH_TELEMETRY_DISABLED=1', 'TERM=xterm-256color'];
-  tmux('new-session', '-d', '-s', name, '-x', String(cols), '-y', String(rows), '-c', profile.work,
+  tmux(socket, 'new-session', '-d', '-s', name, '-x', String(cols), '-y', String(rows), '-c', profile.work,
     `env ${env.join(' ')} ${bin} --profile e2e; echo "[[exited $?]]"; sleep 600`);
-  const capture = () => tmux('capture-pane', '-p', '-t', name);
+  const capture = () => tmux(socket, 'capture-pane', '-p', '-t', name);
   return {
     name,
+    socket,
     capture,
-    keys(...keys) { tmux('send-keys', '-t', name, ...keys); },
-    text(str) { tmux('send-keys', '-t', name, '-l', str); },
+    keys(...keys) { tmux(socket, 'send-keys', '-t', name, ...keys); },
+    text(str) { tmux(socket, 'send-keys', '-t', name, '-l', str); },
     async waitFor(pattern, { timeout = 30000, not = false } = {}) {
       const deadline = Date.now() + timeout;
       let last = '';
@@ -143,6 +146,7 @@ export function startTui(profile, { name = `dsh-ms-e2e-${process.pid}-${Date.now
       }
       throw new Error(`timed out waiting for ${not ? 'absence of ' : ''}${pattern}\n--- screen ---\n${last}`);
     },
-    kill() { try { tmux('kill-session', '-t', name); } catch { /* gone */ } execFileSync('sleep', ['1']); },
+    kill() { try { tmux(socket, 'kill-session', '-t', name); } catch { /* gone */ } execFileSync('sleep', ['1']); },
+    killServer() { try { tmux(socket, 'kill-server'); } catch { /* gone */ } execFileSync('sleep', ['1']); },
   };
 }
