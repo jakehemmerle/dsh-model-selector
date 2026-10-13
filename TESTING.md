@@ -93,12 +93,20 @@ nix-config's dsh-tui profile: the patched dsh-TUI symlinked in, the plugin
 inserted with `shortcut: false`, and two `openai-completions` providers
 pointing at the mock.
 
-## Traceability (SPEC ↔ tests, round 2 status 2026-10-12)
+## Traceability (SPEC ↔ tests, round 3 status 2026-10-13)
 
-Versions under test: DSH `0.2.1-alpha.2`, dsh-TUI `0.14.0` (fleet patch stack,
+Versions under test: DSH `0.2.1-alpha.2`
+(`/nix/store/i24c2k38bz3h86r0v7bjr4amk7d4vxrj-dsh-0.2.1-alpha.2`), dsh-TUI
+`0.14.0` with the fleet patch stack
+(`/nix/store/inl2nrkcnbp50r1yq7fh5y0zibx96gvl-dsh-tui-0.14.0`, vendored in
 `nix/fleet/`), node v24.21.0. Hosts: fast suites via `TuiSceneRuntime` against
-`test/.host`; real-client suites against the store builds in a private tmux
-socket (`test/e2e/`).
+`test/.host` (also at `NUM_RUNS=1000` inside `nix flake check`'s
+`checks.fast`, which builds the same pinned dsh/dsh-TUI via `nix/fleet/`);
+real-client suites against those same store builds in a private tmux socket
+and a disposable web profile (`test/e2e/`). Web runs need
+`PLAYWRIGHT_BROWSERS_PATH=<nix playwright-driver.browsers>` (the cache.mozilla
+npm browsers do not match and Chromium needs the Nix build); the flake's
+`apps.e2e` exports this automatically.
 
 | SPEC property | Test | Surface | Last result |
 |---|---|---|---|
@@ -111,7 +119,49 @@ socket (`test/e2e/`).
 | P-22 omp parity examples | `test/selector.examples.test.js` | TUI fast | green (same runs) |
 | P-23 failed stars write → persisted state + warning | `test/write-failure.test.js` | TUI fast | red `b273cbe` → green after fix `971f076` (33/33 fast suite) |
 | P-24 concurrent writers merge policy | `test/write-failure.test.js` (scene-level, external writer between reads) and `test/concurrent-toggle.test.js` (two REAL child processes racing in the same instant; stale-lock reclaim) | TUI fast + cross-process | **reopened by the round-3 closure audit** (closed state carried a deferred residual: the un-locked RMW lost updates when two processes toggled in the same tick — reproduced red, 4/60 races, commit `e05cba9`) → fix: exclusive lock file around each toggle, stale locks stolen, lock-timeout falls back to the persisted-state warning (`{saved:false}`); green: race test 60/60 rounds keep both stars, stale-lock case passes; full fast suite green |
-| P-25 web inertness | pending | Web real | **pending, round 3** (Playwright, plugin-loaded vs baseline) |
+| dms-86g (release-campaign find, suite-oracle bug) | `test/e2e/tui.property.test.js` soundness oracle | TUI real | red: campaign seeds `20261014`/`20261015` counterexamples flagged rows like `mock/mock-gamma-1-5` for queries `1z`/`e1` (plain-subsequence oracle stricter than the product's documented omp tolerances — lib/fuzzy.js prefix-extension + swaps; the fast-suite oracle was already correct) → fix `dd4909f`: e2e oracle aligned (`soundlyMatches` with swap + ≤2-char overshoot); SPEC P-05 wording updated; green on re-run |
+| P-25 web inertness | `test/e2e/web.inertness.test.js` (real `dsh web` via the rig, Playwright; plugin-loaded vs baseline profiles; per-action landmarks + error parity on both pages; failure screenshots to `test/.artifacts/`) | Web real | see round-3 campaign row below |
 
-No required test silently skips: the e2e suites fail loudly when `DSH_TUI_DIR`
-is unset, and `checks.fast` runs the fast suites inside the Nix build.
+## Mutants (round 3, dms-0ll.8 — caught 4/4)
+
+Each mutant was applied with `sed` to an isolated copy of the repo
+(`/tmp/dms-mutant-N`), the kill suite run there, and the copy discarded.
+
+| Mutant (file, change) | Killed by |
+|---|---|
+| M1 `lib/model.js` `hop()`: empty-scope skip dropped | `test/selector.property.test.js` `scopeHop` oracle — "tab hops to the next non-empty scope" (2 properties fail at NUM_RUNS=25) |
+| M2 `lib/rank.js` `comparator()`: version order flipped | `test/selector.examples.test.js` — version-order case (1 of 20 fail) |
+| M3 `lib/store.js` `acquireLock()`: stale-lock theft dropped | `test/concurrent-toggle.test.js` — stale-lock reclaim case (the race case correctly still passes) |
+| M4b `lib/store.js` `toggleStar()`: dms-0ll.10 failure fallback guard dropped | `test/write-failure.test.js` — "persisted state (no phantom star)" |
+
+Process notes recorded honestly: a first sed used a conflicting delimiter
+(mutants not applied; all suites green; run voided); mutant M4 v1 (phantom
+stars behind the lock) was unreachable by design because the lock fallback is
+the very guard under test, so it was redesigned as M4b (fallback dropped) and
+killed as recorded. The examples suite alone does not pin idle hop landing
+(the fast property does) — matching the M1 kill path.
+
+## Replay commands (round 3)
+
+Fast suites (host runtime):
+
+    node scripts/link-host.mjs && NUM_RUNS=1000 node --preserve-symlinks --test --test-concurrency=1 test/*.test.js
+
+Real-client TUI suites (private tmux socket; replay failures with FC_SEED
+plus the shrunk path printed in the campaign logs at test/.artifacts/campaign/):
+
+    DSH_TUI_DIR=/nix/store/inl2nrkcnbp50r1yq7fh5y0zibx96gvl-dsh-tui-0.14.0/lib/node_modules/@deepseek-harness-tui/dsh-tui \
+    DSH_VERSION=0.2.1-alpha.2 FC_SEED=<seed> TUI_PROP_LAUNCH=40 TUI_PROP_CHAT=40 TUI_PROP_BUSY=8 TUI_PROP_RESTART=8 \
+    node --test --test-concurrency=1 --test-timeout=3600000 test/e2e/tui.property.test.js
+
+Web inertness (Nix Chromium via playwright-driver.browsers; flake apps.e2e
+exports this automatically):
+
+    PLAYWRIGHT_BROWSERS_PATH=/nix/store/3200rnpy59wxz2za3jzqd5ddm6ysp2bp-playwright-browsers \
+    FC_SEED=<seed> WEB_INERTNESS_SEQ=<n> node --test --test-concurrency=1 test/e2e/web.inertness.test.js
+
+Campaign logs (per-seed stdout incl. fast-check seeds and shrunk
+counterexamples) live in test/.artifacts/campaign/.
+
+No required test silently skips: the e2e suites fail loudly when DSH_TUI_DIR
+is unset, and checks.fast runs the fast suites inside the Nix build.
