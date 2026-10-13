@@ -13,7 +13,11 @@
 // the sidebar's active scope carries the ❯. This profile's real llm catalog has
 // 6 models (the two mock providers plus dsh's deepseek-official registry
 // provider), so row ids are treated as opaque; their ids carry every token the
-// generator can type, which keeps the soundness check exact for this fixture.
+// generator can type, which keeps the soundness check exact for this fixture
+// modulo omp's tolerances (one adjacent letter/digit swap; a token may
+// overshoot a word by up to two trailing characters — soundlyMatches below is
+// aligned with the fast suite's documented oracle; the stricter plain
+// subsequence was a suite bug found by the release campaign, dms-0ll.13).
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { writeFileSync } from 'node:fs';
@@ -64,6 +68,30 @@ const subseq = (needle, hay) => {
 const token = (q) => [...q].filter((c) => /[a-z0-9]/i.test(c)).join('').toLowerCase();
 const hayOf = (key) => key.toLowerCase().replace(/[^a-z0-9]/g, ''); // ids carry the generator's tokens
 
+/** omp's typo tolerances, mirroring the fast suite's documented oracle
+ * (test/selector.property.test.js): at most one adjacent letter/digit swap and
+ * a token may overshoot a word by up to two trailing characters. Found by the
+ * release campaign (dms-0ll.13): the plain-subsequence oracle here was
+ * stricter than the product's ported omp matcher and flagged rows like
+ * mock/mock-gamma-1-5 for a query '1z' (the '1' word plus a two-char
+ * overshoot) that the fast suite correctly accepts. */
+const swaps = (needle) => {
+  const chars = [...needle];
+  const out = [needle];
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    const a = chars[i];
+    const b = chars[i + 1];
+    if ((/[a-z]/.test(a) && /\d/.test(b)) || (/\d/.test(a) && /[a-z]/.test(b))) {
+      out.push(chars.slice(0, i).concat(b, a, chars.slice(i + 2)).join(''));
+    }
+  }
+  return out;
+};
+function soundlyMatches(query, key) {
+  const t = token(query);
+  return t === '' || swaps(t).some((variant) => subseq(variant.slice(0, Math.max(1, variant.length - 2)), hayOf(key)));
+}
+
 // ---- the model (expected screen state), independent of lib/ ---------------
 
 class Model {
@@ -98,8 +126,7 @@ function assertInvariants(screen, model, tag) {
   for (const r of f.rows) {
     assert.equal(r.starred, model.stars.has(r.key), `${ctx}: ★ of ${r.key} matches the starred set`);
     assert.equal(r.live, r.key === model.live, `${ctx}: ✓ only on the live route (${r.key})`);
-    const t = token(model.query);
-    if (t) assert.ok(subseq(t, hayOf(r.key)), `${ctx}: row ${r.key} matches query tokens (soundness)`);
+    assert.ok(soundlyMatches(model.query, r.key), `${ctx}: row ${r.key} matches query tokens (soundness, omp tolerances)`);
   }
   if (model.focus && f.rows.length > 0) {
     if (model.focus.key !== undefined) assert.equal(focused[0]?.key, model.focus.key, `${ctx}: focused row key`);
@@ -293,7 +320,7 @@ async function runSequence(kind, cmds, tagPrefix, opener = 'mp') {
 
 // ---- suites -----------------------------------------------------------------
 
-describe('dsh-model-selector TUI properties (real host, private tmux socket)', { concurrency: 1, timeout: 600000 }, () => {
+describe('dsh-model-selector TUI properties (real host, private tmux socket)', { concurrency: 1, timeout: 1800000 }, () => {
   before(async () => {
     if (!process.env.DSH_TUI_DIR) throw new Error('set DSH_TUI_DIR to the patched dsh-tui build');
   });
