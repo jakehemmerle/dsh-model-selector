@@ -260,10 +260,19 @@ async function runCommand(tui, profile, model, cmd, tag) {
       const target = focusKey;
       model.open = false;
       if (target !== model.live) {
-        await waitModelIs(profile, target, `${tag} enter-pick`);
+        await waitModelIs(profile, target, tag + ' enter-pick');
         model.live = target;
-        const recents = profile.read('model-recents.json');
-        assert.equal(`${recents.models[0]?.provider}/${recents.models[0]?.id}`, target, `${tag}: recents front after pick`);
+        // recordRecent runs right after the host's switch completes; poll
+        // the file like starsFileIs instead of racing a one-shot read (a
+        // campaign run saw model.json update before recents landed).
+        let recents;
+        for (let i = 0; i < 30; i += 1) {
+          recents = profile.read('model-recents.json');
+          if (recents && recents.models[0] !== undefined && recents.models[0].provider + '/' + recents.models[0].id === target) break;
+          await sleep(100);
+        }
+        assert.ok(recents !== undefined, tag + ': model-recents.json exists after pick');
+        assert.equal(recents.models[0].provider + '/' + recents.models[0].id, target, tag + ': recents front after pick');
       }
       break;
     }
@@ -277,6 +286,24 @@ async function runCommand(tui, profile, model, cmd, tag) {
 }
 
 /** A fresh real TUI per generated case (fresh fixture per case and shrink). */
+/** Submit a prompt on the launch/chat composer. The historical Launchpad
+ * Enter drop (text+Enter in one burst gets eaten about half the time) makes
+ * single-burst submits flaky; setup prompts are not a property under test, so
+ * retry Enter until the mock actually sees the request. */
+async function submitPrompt(tui, mock, text, { retries = 4 } = {}) {
+  tui.text(text);
+  await sleep(300);
+  tui.keys('Enter');
+  for (let i = 0; i < retries; i += 1) {
+    let seen = false;
+    for (let k = 0; k < 30 && !(seen = mock.requests.some((r) => JSON.stringify(r.messages ?? []).includes(text))); k += 1) await sleep(100);
+    if (seen) return;
+    tui.keys('Enter');
+    await sleep(600);
+  }
+  const payload = 'premise: ' + JSON.stringify(text) + ' was submitted to the mock';
+  assert.ok(mock.requests.some((r) => JSON.stringify(r.messages ?? []).includes(text)), payload);
+}
 async function withFixture(kind, run) {
   const mock = await startMock();
   const profile = makeProfile({ port: mock.port });
@@ -284,9 +311,7 @@ async function withFixture(kind, run) {
   try {
     await tui.waitFor(/Say something/u, { timeout: 60000 });
     if (kind === 'chat') {
-      tui.text('warm the chat');
-      await sleep(300);
-      tui.keys('Enter');
+      await submitPrompt(tui, mock, 'warm the chat');
       await tui.waitFor(/pong from mock-alpha/u, { timeout: 20000 });
     }
     await run(tui, profile, mock);
@@ -348,12 +373,7 @@ describe('dsh-model-selector TUI properties (real host, private tmux socket)', {
       fc.asyncProperty(fc.nat(2), async (downs) => {
         await withFixture('chat', async (tui, prof, m) => {
           m.hold(true);
-          tui.text('busy probe');
-          await sleep(300);
-          tui.keys('Enter');
-          let seen = false;
-          for (let i = 0; i < 100 && !(seen = m.requests.some((r) => JSON.stringify(r.messages ?? []).includes('busy probe'))); i += 1) await sleep(100);
-          assert.ok(seen, 'premise: the turn is actually running (request reached the mock)');
+          await submitPrompt(tui, m, 'busy probe');
           await openScene(tui);
           for (let i = 0; i < downs; i += 1) { tui.keys('Down'); await sleep(200); }
           tui.keys('Enter');
