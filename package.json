@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-selector",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "type": "module",
   "description": "omp-style model selector scene for dsh-TUI: type-to-search, starred models, provider sidebar on the right",

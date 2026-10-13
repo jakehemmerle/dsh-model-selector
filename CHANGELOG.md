@@ -48,13 +48,29 @@ built around it (epic `dms-0ll`).
 - **dms-0ll.12** — the tmux e2e runs on a private socket (`-f /dev/null`),
   never the default server; the restart-catalog race (empty 0/0 frame cascading
   into the busy-turn test) fixed; 10/10 loops green (`466d476`).
+- **dms-86g (found by the round-3 release campaign, suite-oracle fix)** — the
+  real-TUI soundness oracle was stricter than the product's documented omp
+  tolerances; aligned with the fast-suite oracle, SPEC P-05 wording updated.
 
 ### Testing
 
-- DSH `0.2.1-alpha.2`, dsh-TUI `0.14.0` (fleet patch stack), node
-  `v24.21.0`, npm playwright `1.59.1` with the Nix Chromium.
-- Version under test, suite evidence, seeds and the replay commands: see the
-  traceability sections in `TESTING.md`.
-- Mutants: caught N/N recorded in `TESTING.md`.
+- DSH `0.2.1-alpha.2`
+  (`/nix/store/i24c2k38bz3h86r0v7bjr4amk7d4vxrj-dsh-0.2.1-alpha.2`), dsh-TUI
+  `0.14.0` with the fleet patch stack
+  (`/nix/store/inl2nrkcnbp50r1yq7fh5y0zibx96gvl-dsh-tui-0.14.0`), node
+  `v24.21.0`, npm playwright `1.59.1` with the Nix Chromium
+  (`playwright-driver.browsers`).
+- `nix flake check`: **all checks passed** — `checks.fast` runs every fast
+  suite at `NUM_RUNS=1000` in the Nix sandbox; `package` builds the artifact.
+- Real-client release campaigns over seeds `20261013`–`20261015` (logs in
+  `test/.artifacts/campaign/`, replay commands in `TESTING.md`):
+  - TUI: **288 generated sequences** (launch 120, chat 120, busy 24,
+    restart 24), all green, invariants after every step.
+  - Web inertness: **240 sequence applications** (120 loaded + 120 baseline
+    over the same three seeds), error parity on both pages, green.
+- Mutants: caught **4/4** (hop skip-empty, version order, stale-lock theft,
+  failure-fallback guard), recorded with kill suites in `TESTING.md`.
+- Full traceability (property → test → surface → result/seed/versions) and
+  the replay commands live in `TESTING.md`.
 
 [0.1.0-alpha.1]: ./RELEASING.md
