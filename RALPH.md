@@ -62,6 +62,48 @@ vendor + rig vendor), verified it end-to-end, and landed it:
 - **dms-0ll.7 groundwork**: TESTING.md gained the SPEC ↔ test traceability
   table with versions, seeds and results.
 
+### Round 3 (2026-10-13) — closure audit, campaign, mutants, release v0.1.0-alpha.1
+
+**STEP 0 — closure audit** walked every closed bead against its recorded
+evidence: all 11 evidence commits re-verified, no silent skips, no ~/.agents
+imports. **One reopen: dms-0ll.11** — its closed state carried a deferred
+cross-process residual. Reproduced red (e05cba9): two real processes
+toggling in the same tick lost an update in 4/60 races; a stale .lock was
+never reclaimed. Fixed (6888f34): exclusive lock file around each toggle,
+stale locks stolen, bounded contention timeout falls back to the persisted-
+state warning; re-closed with evidence. The audit also produced **dms-86g**:
+the release campaign's e2e soundness oracle was stricter than the product's
+documented omp tolerances; aligned (dd4909f) and re-verified. (Cosmetic:
+dd4909f's commit message references a planned id dms-0ll.13; the recorded
+bead id is dms-86g.)
+
+**dms-0ll.5 ✓** web inertness suite rewritten from the abandoned workdir
+variant and fixed honestly: missing `after` import; Nix Chromium via
+PLAYWRIGHT_BROWSERS_PATH (playwright-driver.browsers — the npm cache
+revisions mismatch); collapse-landmark driver bug; Plugins-page positive
+proof replaced after probing the alpha (profile rows are never rendered
+there — the load proof is dump-config + clean logs) (b6f57b5).
+
+**Release campaigns** (seeds 20261013-15, logs in
+test/.artifacts/campaign/): first TUI passes exposed two suite
+infrastructure races (Launchpad Enter-drop on setup prompts; a recents
+one-shot read checksum) — fixed (35df6eb) and **all three seeds re-run**
+(rel2-tui-*) under one suite revision: launch 40 / chat 40 / busy 8 /
+restart 8 per seed, all exit 0. **TUI green: 288 sequences** (launch 120 /
+chat 120 / busy 24 / restart 24); **web green: 240 sequence applications**
+(120 loaded + 120 baseline over the same seeds). `nix flake check` **all
+checks passed** (checks.fast at NUM_RUNS=1000).
+
+**dms-0ll.8 ✓** mutants caught **4/4** with honest process notes (a sed
+delimiter failure voided one run; M4 v1 was unreachable by design and
+became M4b), kill suites recorded in TESTING.md (48bab6c).
+
+**dms-0ll.5/.7 ✓** traceability rows, campaign rows and replay commands in
+TESTING.md (5b127a0); **release cut**: version 0.1.0-alpha.1, RELEASING.md +
+CHANGELOG.md, release commit 52dd027, annotated tag v0.1.0-alpha.1 pushed;
+beads .9 and the epic closed; final board 14/14 closed. Per the lead's
+instruction: **HOLD after reporting — no nix-config work.**
+
 ### Next (round 3)
 
 1. **dms-0ll.5 web inertness** (Playwright, real dsh web, plugin-loaded vs
