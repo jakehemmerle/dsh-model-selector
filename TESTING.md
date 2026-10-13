@@ -120,8 +120,36 @@ npm browsers do not match and Chromium needs the Nix build); the flake's
 | P-23 failed stars write → persisted state + warning | `test/write-failure.test.js` | TUI fast | red `b273cbe` → green after fix `971f076` (33/33 fast suite) |
 | P-24 concurrent writers merge policy | `test/write-failure.test.js` (scene-level, external writer between reads) and `test/concurrent-toggle.test.js` (two REAL child processes racing in the same instant; stale-lock reclaim) | TUI fast + cross-process | **reopened by the round-3 closure audit** (closed state carried a deferred residual: the un-locked RMW lost updates when two processes toggled in the same tick — reproduced red, 4/60 races, commit `e05cba9`) → fix: exclusive lock file around each toggle, stale locks stolen, lock-timeout falls back to the persisted-state warning (`{saved:false}`); green: race test 60/60 rounds keep both stars, stale-lock case passes; full fast suite green |
 | dms-86g (release-campaign find, suite-oracle bug) | `test/e2e/tui.property.test.js` soundness oracle | TUI real | red: campaign seeds `20261014`/`20261015` counterexamples flagged rows like `mock/mock-gamma-1-5` for queries `1z`/`e1` (plain-subsequence oracle stricter than the product's documented omp tolerances — lib/fuzzy.js prefix-extension + swaps; the fast-suite oracle was already correct) → fix `dd4909f`: e2e oracle aligned (`soundlyMatches` with swap + ≤2-char overshoot); SPEC P-05 wording updated; green on re-run |
-| P-25 web inertness | `test/e2e/web.inertness.test.js` (real `dsh web` via the rig, Playwright; plugin-loaded vs baseline profiles; per-action landmarks + error parity on both pages; failure screenshots to `test/.artifacts/`) | Web real | see round-3 campaign row below |
+| P-25 web inertness | test/e2e/web.inertness.test.js (real dsh web via the rig, Playwright; plugin-loaded vs baseline profiles; per-action landmarks + error parity on both pages; failure screenshots to test/.artifacts/) | Web real | green: suite pilot 4x2-sequence run (57 s), then release campaign 3 seeds x 40 sequences on both pages (rows below) |
 
+### Round-3 release campaigns (2026-10-13, beads dms-0ll.5/.6/.9)
+
+Seeds `20261013`, `20261014`, `20261015` (plus per-group derived seeds
+`+1`…`+3`), every run logged with full fast-check output in
+`test/.artifacts/campaign/` (`rel2-tui-<seed>.log`, `rel-web-<seed>.log`) and
+replayable from the recorded commands above.
+
+| Campaign | Budget | Result |
+|---|---|---|
+| TUI real client (`rel2-tui-*.log`) | 3 seeds × (launch 40 + chat 40 + busy 8 + restart 8) = **288 sequences**; per surface: launch **120**, chat **120** | **all green** (launch 358–374 s, chat 395–412 s, busy 67–68 s, restart 101–117 s per seed; seeds exit 0); invariants after every step; store paths under test: dsh `0.2.1-alpha.2` + dsh-TUI `0.14.0` fleet patch stack |
+| Web inertness real client (`rel-web-*.log`) | 3 seeds × 40 generated sequences driven identically on BOTH pages = 40 loaded + 40 baseline per seed (**240 sequence applications**) | **all green, all seeds exit 0**; error parity on both pages; the loaded row's proof: `dump-config` row + clean logs (the alpha's Plugins page never renders profile rows — probed) |
+
+Suite-version note (honesty ledger): TUI campaign seeds were first run against
+the pre-fix suite revision and hit two infrastructure races (Launchpad
+Enter-drop on setup prompts; `model-recents.json` one-shot read racing the
+host); both were fixed in the suite (`submitPrompt` retry helper, recents
+poll) and **all three TUI seeds were re-run as `rel2-tui-*` under one fixed
+suite revision**. Web campaigns all ran under the committed suite.
+
+| SPEC property | Test | Surface | Last result |
+|---|---|---|---|
+| P-01…P-17, P-19…P-22 (release campaign, generated sequences on the real host) | `test/e2e/tui.property.test.js` (rel2 campaign) | TUI real | **green: 288 sequences over 3 seeds** (launch 120 / chat 120 / busy 24 / restart 24, logs `rel2-tui-20261013/14/15`), seeds `20261013`-`20261015`, exit 0 per seed |
+| P-25 web inertness (release campaign) | `test/e2e/web.inertness.test.js` (rel-web campaign) | Web real | **green: 120 loaded + 120 baseline sequences over the same 3 seeds** (logs `rel-web-20261013/14/15`), error parity on both pages, no console/page errors beyond the shared allowlist, release run `nix flake check` green and real-client suites green **2026-10-13** |
+
+Release gate (2026-10-13): `nix flake check` — all checks passed
+(`checks.fast` = every top-level fast suite at `NUM_RUNS=1000` inside the
+Nix sandbox against the same pinned dsh/dsh-TUI builds; `package` builds the
+store artifact), plus the two campaigns above and mutants 4/4.
 ## Mutants (round 3, dms-0ll.8 — caught 4/4)
 
 Each mutant was applied with `sed` to an isolated copy of the repo
