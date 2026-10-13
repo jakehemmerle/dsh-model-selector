@@ -102,6 +102,7 @@ socket (`test/e2e/`).
 
 | SPEC property | Test | Surface | Last result |
 |---|---|---|---|
+| *(round-3 closure audit, 2026-10-13)* | walked every closed bead against its recorded commit/test evidence; all 11 evidence commits re-verified; **one reopen: dms-0ll.11** (see P-24 row) | — | audit clean otherwise: no silent skips, no `~/.agents` imports, suites run real clients |
 | P-01…P-07, P-09…P-12, P-14…P-17 | `test/selector.property.test.js` (model-based through the host runtime) | TUI fast | green, NUM_RUNS=1000 in `nix flake check` (`checks.fast`, 30/30, 0 skipped, 644 s, 2026-10-11) and NUM_RUNS=25/40 locally |
 | P-08 landing/scope semantics | same, plus `test/selector.examples.test.js` | TUI fast | green (same runs) |
 | P-18 openings + draft drop, P-19 pick reaches the mock with history, P-20 no host warnings, P-13 busy refusal, P-16 restart persistence | `test/e2e/tui.e2e.test.js` (real dsh + patched dsh-TUI, private tmux socket) | TUI real | green, **10/10 consecutive loops** (8/8 tests each, 2026-10-11, after the restart-catalog-race fix `7ef3902`) |
@@ -109,7 +110,7 @@ socket (`test/e2e/`).
 | P-21 contract seams | `test/contract.test.js` | TUI fast | green (same runs) |
 | P-22 omp parity examples | `test/selector.examples.test.js` | TUI fast | green (same runs) |
 | P-23 failed stars write → persisted state + warning | `test/write-failure.test.js` | TUI fast | red `b273cbe` → green after fix `971f076` (33/33 fast suite) |
-| P-24 concurrent writers merge policy | `test/write-failure.test.js` (scene + simulated second writer) | TUI fast | green (RMW union verified); residual cross-process RMW window documented in SPEC; file-locking follow-up deferred |
+| P-24 concurrent writers merge policy | `test/write-failure.test.js` (scene-level, external writer between reads) and `test/concurrent-toggle.test.js` (two REAL child processes racing in the same instant; stale-lock reclaim) | TUI fast + cross-process | **reopened by the round-3 closure audit** (closed state carried a deferred residual: the un-locked RMW lost updates when two processes toggled in the same tick — reproduced red, 4/60 races, commit `e05cba9`) → fix: exclusive lock file around each toggle, stale locks stolen, lock-timeout falls back to the persisted-state warning (`{saved:false}`); green: race test 60/60 rounds keep both stars, stale-lock case passes; full fast suite green |
 | P-25 web inertness | pending | Web real | **pending, round 3** (Playwright, plugin-loaded vs baseline) |
 
 No required test silently skips: the e2e suites fail loudly when `DSH_TUI_DIR`

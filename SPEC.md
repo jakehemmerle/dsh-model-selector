@@ -53,12 +53,14 @@ expected value is imported from production code.
 | P-21 | Contract seams (dsh-TUI bump guard): `ChannelUi` methods the scene uses, the public `./scenes` subpath, scene + shortcut registration with no host warnings, disposal on unload restores original behavior, `shortcut: false` config, recents format, nothing recorded when the host refuses a switch, fresh catalog read on every open | Host runtime assertions (real `TuiSceneRuntime`/`TuiShortcutRuntime`) | TUI (contract) |
 | P-22 | omp parity examples: exact match outranks recents; recents and stars break ties; version order (1.5 > 1); letter/digit swap tolerance; All models spans providers; provider-scoped search keeps that provider; empty-scope query falls back to All models; hops skip empty scopes; Starred → All on typing; Esc twice closes; Starred empty state; Recent order; phone-width layout; windowing; metadata detail line | Expected outputs from omp's ported test cases | TUI (examples) |
 | P-23 | **[bug dms-0ll.10]** When the stars file cannot be written, the scene shows the **persisted** state (no phantom star) and tells the user the star was not saved | Read-only file injected via `starsFile`; toggle → frame still shows unstarred + a warning is visible | TUI |
-| P-24 | **[bug dms-0ll.11]** Concurrent writers of `model-stars.json` follow the spec merge policy — read-modify-write per toggle, re-read on open and on toggle — so a second writer's stars are never dropped or resurrected by a stale in-memory set; the tmp file name cannot collide between processes | Two interleaved writers (deterministic schedule); final file and both scenes' views contain both stars | TUI |
+| P-24 | **[bug dms-0ll.11, reopened by the round-3 closure audit]** Concurrent writers of `model-stars.json` never lose or resurrect a star — each toggle runs a read-modify-write under an exclusive cross-process lock file, re-reads on open and on toggle; a lock older than a dead holder threshold is stolen, and tmp files remain pid-unique | Two real child processes race two distinct toggles in the same instant; the final file contains both stars on every round; a stale lock is stolen and removed | TUI (store + concurrency across processes) |
 | P-25 | **[web inertness]** A real `dsh web` profile with the plugin row loads, serves, and streams turns exactly like a baseline profile without it (same routes answer, composer works, no console/page errors attributable to the plugin) | Same generated session driven on both profiles; diffs limited to the documented row | Web (Playwright, real dsh web) |
 
 ## Traceability
 
 Implementation status is tracked in `TESTING.md` (property → test → surface →
 seed/result). Beads: dms-0ll.2 (this file), .5 (P-25), .6 (P-01…P-22 on a real
-TUI in a private tmux socket), .8 (P-23/P-24 red→green + mutants), .10/.11
-(bug beads), .12 (e2e tmux server bug).
+TUI in a private tmux socket), .7 (traceability table), .8 (P-23/P-24 red→green
++ mutants), .10/.11 (bug beads; .11 was reopened by the round-3 closure audit
+— its closed state carried a deferred cross-process residual — and re-closed
+after the lock fix), and .12 (e2e tmux server bug).
