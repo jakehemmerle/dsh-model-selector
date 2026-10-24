@@ -68,10 +68,15 @@ export function isolatedHome() {
  * The ChannelUi slice the scene may touch, recorded. Shape follows
  * dsh-TUI's adapter/ports/channel-ui.d.ts.
  */
-export function fakeChannel({ models, providers, provider = '', model = '', working = false, switchResult = true }) {
+export function fakeChannel({
+  models, providers, provider = '', model = '', working = false, switchResult = true,
+  // dsh-TUI 0.15 ChannelCapabilities (adapter/ports/channel-view.d.ts): the DSH
+  // kernel reports backendId 'dsh' and provider-tab model routes.
+  backendCapabilities = { backendId: 'dsh', models: true, modelRoutes: 'providers' },
+}) {
   const calls = { switchModel: [], notify: [], closePluginScene: 0, listModels: 0 };
   const channel = {
-    provider, model, working,
+    provider, model, working, backendCapabilities,
     modelDisplay: model,
     async listModels() { calls.listModels += 1; return models.map((m) => ({ ...m })); },
     async listProviders() { return providers.map((p) => ({ ...p })); },
